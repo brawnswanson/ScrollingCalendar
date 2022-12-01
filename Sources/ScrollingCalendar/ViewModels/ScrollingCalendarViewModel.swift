@@ -12,17 +12,20 @@ public class ScrollingCalendarViewModel: ObservableObject {
   var interface: ScrollingCalendarInterface
   
   @Published var calendarCells: [CalendarCellModel] = []
+  @Published var calendarType: CalendarType
   
   let cal = Calendar.current
   
-  public init(interface: ScrollingCalendarInterface) {
+  public init(interface: ScrollingCalendarInterface, calendarType: CalendarType = .fixedLength(months: 12)) {
     self.interface = interface
+    self.calendarType = calendarType
   }
 }
 
 //MARK: - Calendar cell creation functions
 extension ScrollingCalendarViewModel {
   func loadNewCalendarCell(afterCurrentCell cell: CalendarCellModel) async throws {
+    if calendarType != .variableLength { return }
     let currentCell = try await checkIfIsLast(cell: cell)
     let dateOfCurrentCell = try await getDateOf(cell: currentCell)
     let newCell = try await getCalendarCellByAdding(months: -1, to: dateOfCurrentCell)
@@ -41,7 +44,14 @@ extension ScrollingCalendarViewModel {
   }
   
   func createInitialCalendarCells() async {
-    for i in 0..<12 {
+    var startingMonthOffset:Int
+    switch calendarType {
+    case .fixedLength(let months):
+      startingMonthOffset = -months
+    default:
+      startingMonthOffset = -12
+    }
+    for i in startingMonthOffset..<1 {
       if let cell = try? await getCalendarCellByAdding(months: i, to: Date()) {
         await addCalendarCellToModel(cell)
       }
@@ -76,5 +86,21 @@ extension ScrollingCalendarViewModel {
     case dateComponentConversionError
     case noCurrentCells
     case notLastCell
+  }
+}
+
+public enum CalendarType: Equatable {
+  case fixedLength(months: Int = 12)
+  case variableLength
+  
+  public static func == (lhs: CalendarType, rhs: CalendarType) -> Bool {
+    switch (lhs, rhs) {
+    case (.fixedLength, .fixedLength):
+      return true
+    case (.variableLength, .variableLength):
+      return true
+    default:
+      return false
+    }
   }
 }
